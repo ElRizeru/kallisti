@@ -527,10 +527,7 @@ export const createStreamClient = (url: string, token: () => Promise<string>, au
   const pump = (session: number, v: Viewer) => {
     const now = clockOf(v);
     while (v.pending.length && (v.pending[0]!.when ?? 0) <= now + DECODE_AHEAD) decodeNext(session, v);
-    const i = lastDue(
-      v.queue.map((q) => q.when),
-      now,
-    );
+    const i = lastDue(v.queue, now);
     if (i < 0) return;
     const shown = v.queue.splice(0, i + 1);
     draw(v, shown[i]!.frame);

@@ -145,4 +145,11 @@ describe("lastDue", () => {
     expect(lastDue([], 5)).toBe(-1);
     expect(lastDue([1, 2], 9)).toBe(1);
   });
+
+  it("handles queue entries with a when property without extra mapping allocations", () => {
+    expect(lastDue([{ when: 1 }, { when: 2 }, { when: 3 }], 2.5)).toBe(1);
+    expect(lastDue([{ when: 1 }, { when: 2 }, { when: 3 }], 0.5)).toBe(-1);
+    expect(lastDue([], 5)).toBe(-1);
+    expect(lastDue([{ when: 1 }, { when: 2 }], 9)).toBe(1);
+  });
 });

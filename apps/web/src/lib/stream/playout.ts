@@ -82,10 +82,15 @@ export const createPlayout = () => {
 
 export type Playout = ReturnType<typeof createPlayout>;
 
-// The newest of the queued items (play times, oldest first) whose time came;
-// the ones before it are skipped. -1: none yet.
-export const lastDue = (times: readonly number[], now: number): number => {
+// The newest of the queued items (play times or queue entries with when,
+// oldest first) whose time came; the ones before it are skipped. -1: none yet.
+export const lastDue = (times: readonly (number | { when: number })[], now: number): number => {
   let i = -1;
-  while (i + 1 < times.length && times[i + 1]! <= now) i++;
+  while (i + 1 < times.length) {
+    const item = times[i + 1]!;
+    const t = typeof item === "number" ? item : item.when;
+    if (t > now) break;
+    i++;
+  }
   return i;
 };

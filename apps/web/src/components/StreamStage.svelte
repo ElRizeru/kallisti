@@ -165,6 +165,14 @@
       },
     };
   };
+
+  $effect(() => {
+    if (focusing && stripHidden) {
+      for (const s of strip) attach(s, null);
+    } else {
+      for (const [s, c] of canvases) attach(s, c);
+    }
+  });
 </script>
 
 <section class="stage" class:focusing class:bare={focusing && stripHidden} bind:this={stage} aria-label={t("media.streams")}>
