@@ -84,9 +84,9 @@ describe("createPlayout", () => {
     expect(p.rate()).toBe(1);
     step(20);
     expect(p.lead()).toBeLessThan(1);
-    expect(p.lead()).toBeGreaterThan(0.85); // sound plays 2 % faster, unheard
-    expect(p.rate()).toBeCloseTo(1.02);
-    step(100);
+    expect(p.lead()).toBeGreaterThan(0.95); // sound plays 0.5 % faster, unheard
+    expect(p.rate()).toBeCloseTo(1.005);
+    step(150);
     expect(p.lead()).toBeCloseTo(MIN_LEAD);
     expect(p.rate()).toBe(1);
     expect(p.at(s(t), t)! - t).toBeCloseTo(MIN_LEAD, 2); // the items moved with it
@@ -151,7 +151,7 @@ describe("createPlayout", () => {
     for (let t = 1.04; t <= 2.98; t += 0.02) p.at(s(t), 3.001);
     expect(p.lead()).toBe(MAX_LEAD);
     let now = 3.001;
-    for (let t = 3.0; t <= 75; t += 0.02, now += 0.02) p.at(s(t), now);
+    for (let t = 3.0; t <= 250; t += 0.02, now += 0.02) p.at(s(t), now);
     expect(p.lead()).toBeCloseTo(MIN_LEAD, 2);
   });
 });
