@@ -70,7 +70,7 @@ describe("createPlayout", () => {
     expect(p.at(s(5.02), 7)).toBeCloseTo(7 + MIN_LEAD);
   });
 
-  it("lowers the lead slowly after a calm minute, not below the least", () => {
+  it("lowers the lead slowly after a calm period, not below the least", () => {
     const p = createPlayout();
     p.at(s(0), 0);
     p.at(s(0), 1); // 0.5 s late: lead 1
@@ -79,17 +79,23 @@ describe("createPlayout", () => {
     const step = (until: number) => {
       for (; t < until; t += 0.02) expect(p.at(s(t), t)).not.toBeNull();
     };
-    step(60);
-    expect(p.lead()).toBeCloseTo(1); // not yet a calm minute
+    step(15);
+    expect(p.lead()).toBeCloseTo(1); // not yet calm
     expect(p.rate()).toBe(1);
-    step(70);
+    step(20);
     expect(p.lead()).toBeLessThan(1);
-    expect(p.lead()).toBeGreaterThan(0.9); // slowly: sound plays a little faster, unheard
-    expect(p.rate()).toBeCloseTo(1.005);
-    step(400);
+    expect(p.lead()).toBeGreaterThan(0.85); // sound plays 2 % faster, unheard
+    expect(p.rate()).toBeCloseTo(1.02);
+    step(100);
     expect(p.lead()).toBeCloseTo(MIN_LEAD);
     expect(p.rate()).toBe(1);
     expect(p.at(s(t), t)! - t).toBeCloseTo(MIN_LEAD, 2); // the items moved with it
+  });
+
+  it("allows setting a custom minLead", () => {
+    const p = createPlayout(0.3);
+    expect(p.lead()).toBeCloseTo(0.3);
+    expect(p.at(s(1), 10)).toBeCloseTo(10.3);
   });
 
   it("does not lower the lead into the jitter it still sees", () => {
@@ -144,5 +150,12 @@ describe("lastDue", () => {
     expect(lastDue([1, 2, 3], 0.5)).toBe(-1);
     expect(lastDue([], 5)).toBe(-1);
     expect(lastDue([1, 2], 9)).toBe(1);
+  });
+
+  it("handles queue entries with a when property without extra mapping allocations", () => {
+    expect(lastDue([{ when: 1 }, { when: 2 }, { when: 3 }], 2.5)).toBe(1);
+    expect(lastDue([{ when: 1 }, { when: 2 }, { when: 3 }], 0.5)).toBe(-1);
+    expect(lastDue([], 5)).toBe(-1);
+    expect(lastDue([{ when: 1 }, { when: 2 }], 9)).toBe(1);
   });
 });

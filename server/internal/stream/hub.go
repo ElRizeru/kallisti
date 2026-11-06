@@ -371,6 +371,9 @@ func (h *Hub) forward(session uint32, f []byte, from *Ingest) {
 	if st.wantKey {
 		h.askKeyLocked(streamer, st)
 	}
+	if len(st.viewers) == 0 {
+		return
+	}
 	out := binary.BigEndian.AppendUint32(make([]byte, 0, 4+len(f)), streamer)
 	out = append(out, f...)
 	for v, vw := range st.viewers {

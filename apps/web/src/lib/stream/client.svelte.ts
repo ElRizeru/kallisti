@@ -454,6 +454,15 @@ export const createStreamClient = (url: string, token: () => Promise<string>, au
     if (!ctx) return;
     v.gain = new GainNode(ctx, { gain: deaf ? 0 : (sounds[session] ?? 1) });
     v.gain.connect(ctx.destination);
+    const pool: AudioBuffer[] = [];
+    const getBuffer = (length: number) => {
+      const b = pool.pop();
+      if (b && b.length === length) return b;
+      return ctx.createBuffer(1, length, SOUND.sampleRate);
+    };
+    const putBuffer = (b: AudioBuffer) => {
+      if (pool.length < 32) pool.push(b);
+    };
     // WebCodecs where it has Opus, else libopus (the iOS app has no
     // AudioDecoder; the Linux app's leaks). Mono: one channel of two.
     v.sound = voiceDecoder({
@@ -462,9 +471,10 @@ export const createStreamClient = (url: string, token: () => Promise<string>, au
         const at = runs ? v.playout.at(timestamp, ctx.currentTime) : null;
         if (runs && at === null) v.stats.late("sound");
         if (at === null || !v.gain || !plane) return;
-        const buffer = ctx.createBuffer(1, plane.length, SOUND.sampleRate);
+        const buffer = getBuffer(plane.length);
         buffer.copyToChannel(plane, 0);
         const src = new AudioBufferSourceNode(ctx, { buffer, playbackRate: v.playout.rate() });
+        src.onended = () => putBuffer(buffer);
         src.connect(v.gain);
         src.start(at);
       },
@@ -488,13 +498,16 @@ export const createStreamClient = (url: string, token: () => Promise<string>, au
   let raf = 0;
   let ticker: Worker | null = null;
   const pumpAll = () => watched.forEach((v, session) => pump(session, v));
-  const tickRate = () => ticker?.postMessage(document.hidden ? 1000 / 60 : 1000);
+  const hasPip = () => typeof document !== "undefined" && !!document.pictureInPictureElement;
+  const tickRate = () => ticker?.postMessage(document.hidden ? (hasPip() ? 1000 / 60 : 100) : 1000);
   const startLoop = () => {
     if (ticker) return;
     ticker = new Ticker();
     ticker.onmessage = () => document.hidden && pumpAll();
     tickRate();
     document.addEventListener("visibilitychange", tickRate);
+    document.addEventListener("enterpictureinpicture", tickRate);
+    document.addEventListener("leavepictureinpicture", tickRate);
     const frame = () => {
       raf = requestAnimationFrame(frame);
       pumpAll();
@@ -504,6 +517,8 @@ export const createStreamClient = (url: string, token: () => Promise<string>, au
   const stopLoop = () => {
     cancelAnimationFrame(raf);
     document.removeEventListener("visibilitychange", tickRate);
+    document.removeEventListener("enterpictureinpicture", tickRate);
+    document.removeEventListener("leavepictureinpicture", tickRate);
     ticker?.terminate();
     ticker = null;
   };
@@ -515,10 +530,7 @@ export const createStreamClient = (url: string, token: () => Promise<string>, au
   const pump = (session: number, v: Viewer) => {
     const now = clockOf(v);
     while (v.pending.length && (v.pending[0]!.when ?? 0) <= now + DECODE_AHEAD) decodeNext(session, v);
-    const i = lastDue(
-      v.queue.map((q) => q.when),
-      now,
-    );
+    const i = lastDue(v.queue, now);
     if (i < 0) return;
     const shown = v.queue.splice(0, i + 1);
     draw(v, shown[i]!.frame);
@@ -713,7 +725,7 @@ type ProcessorCtor = new (init: { track: MediaStreamTrack }) => { readable: Read
 
 const draw = (v: Viewer, frame: VideoFrame) => {
   const c = v.canvas;
-  if (!c) return;
+  if (!c || (typeof document !== "undefined" && document.hidden && !document.pictureInPictureElement)) return;
   if (c.width !== frame.displayWidth || c.height !== frame.displayHeight) {
     c.width = frame.displayWidth;
     c.height = frame.displayHeight;
