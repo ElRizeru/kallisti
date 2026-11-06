@@ -6,7 +6,7 @@
 // The first item (picture or sound) sets the clock: it plays the lead after
 // it came. A late item raises the lead in steps, up to MAX_LEAD, and plays at
 // once: a short pause, not a skip (what was already scheduled stays). After
-// a calm period the lead goes down again (sound plays 2 % faster
+// a calm period the lead goes down again (sound plays 0.5 % faster
 // meanwhile, see rate; nobody hears that), while the slowest item since
 // then still had more than MIN_LEAD to spare. Only items move it: at most
 // IDLE seconds of drift per item, so a still screen share that sends one
@@ -15,7 +15,7 @@ export const MIN_LEAD = 0.5;
 export const MAX_LEAD = 1.5;
 const STEP = 0.25;
 const CALM = 15; // seconds without a late item before the lead goes down
-const DRIFT = 0.02; // seconds less lead per second
+const DRIFT = 0.005; // seconds less lead per second (0.5% - natural and inaudible pitch shift)
 const STUCK = 1; // late this long at the most lead: a delay that stays, start over
 const FAR_AHEAD = 1; // seconds beyond the lead: the clock jumped, start over
 const IDLE = 1; // seconds between items that count for lowering, at the most
