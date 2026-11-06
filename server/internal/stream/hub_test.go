@@ -521,3 +521,25 @@ func TestDroppedFramesAreCountedPerViewer(t *testing.T) {
 		t.Fatal("counts outlive the connection")
 	}
 }
+
+func TestFramesWithoutViewers(t *testing.T) {
+	h, _, sinks := setup()
+	h.Start(1, Config{Codec: "vp8", Width: 640, Height: 360, Audio: "opus"})
+	var soundSession uint32
+	var soundByte byte
+	h.OnSound = func(streamer uint32, opus []byte, _ uint64) {
+		soundSession = streamer
+		if len(opus) > 0 {
+			soundByte = opus[0]
+		}
+	}
+	h.Frame(1, frame(true, 1))
+	h.Frame(1, frame(false, 2))
+	h.Frame(1, audio(7))
+	if soundSession != 1 || soundByte != 7 {
+		t.Fatalf("sound to mumble: got session %d byte %d", soundSession, soundByte)
+	}
+	if len(sinks[2].frames) != 0 {
+		t.Fatal("frames sent to unwatched sink")
+	}
+}
