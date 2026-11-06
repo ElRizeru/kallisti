@@ -495,13 +495,16 @@ export const createStreamClient = (url: string, token: () => Promise<string>, au
   let raf = 0;
   let ticker: Worker | null = null;
   const pumpAll = () => watched.forEach((v, session) => pump(session, v));
-  const tickRate = () => ticker?.postMessage(document.hidden ? 1000 / 60 : 1000);
+  const hasPip = () => typeof document !== "undefined" && !!document.pictureInPictureElement;
+  const tickRate = () => ticker?.postMessage(document.hidden ? (hasPip() ? 1000 / 60 : 100) : 1000);
   const startLoop = () => {
     if (ticker) return;
     ticker = new Ticker();
     ticker.onmessage = () => document.hidden && pumpAll();
     tickRate();
     document.addEventListener("visibilitychange", tickRate);
+    document.addEventListener("enterpictureinpicture", tickRate);
+    document.addEventListener("leavepictureinpicture", tickRate);
     const frame = () => {
       raf = requestAnimationFrame(frame);
       pumpAll();
@@ -511,6 +514,8 @@ export const createStreamClient = (url: string, token: () => Promise<string>, au
   const stopLoop = () => {
     cancelAnimationFrame(raf);
     document.removeEventListener("visibilitychange", tickRate);
+    document.removeEventListener("enterpictureinpicture", tickRate);
+    document.removeEventListener("leavepictureinpicture", tickRate);
     ticker?.terminate();
     ticker = null;
   };
@@ -717,7 +722,7 @@ type ProcessorCtor = new (init: { track: MediaStreamTrack }) => { readable: Read
 
 const draw = (v: Viewer, frame: VideoFrame) => {
   const c = v.canvas;
-  if (!c) return;
+  if (!c || (typeof document !== "undefined" && document.hidden && !document.pictureInPictureElement)) return;
   if (c.width !== frame.displayWidth || c.height !== frame.displayHeight) {
     c.width = frame.displayWidth;
     c.height = frame.displayHeight;
