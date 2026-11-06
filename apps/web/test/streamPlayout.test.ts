@@ -142,6 +142,18 @@ describe("createPlayout", () => {
     expect(p.lead()).toBe(MIN_LEAD);
     expect(p.at(s(9), 20)).toBeCloseTo(20 + MIN_LEAD);
   });
+
+  it("recovers lead after a network stall and burst of queued items", () => {
+    const p = createPlayout();
+    p.at(s(0), 0);
+    for (let t = 0.02; t <= 1; t += 0.02) p.at(s(t), t);
+    p.at(s(1.02), 3.0);
+    for (let t = 1.04; t <= 2.98; t += 0.02) p.at(s(t), 3.001);
+    expect(p.lead()).toBe(MAX_LEAD);
+    let now = 3.001;
+    for (let t = 3.0; t <= 75; t += 0.02, now += 0.02) p.at(s(t), now);
+    expect(p.lead()).toBeCloseTo(MIN_LEAD, 2);
+  });
 });
 
 describe("lastDue", () => {

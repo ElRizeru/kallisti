@@ -28,11 +28,13 @@ export const createPlayout = (minLead = MIN_LEAD) => {
   let last = 0;
   let lateSince: number | null = null;
   let lowering = false;
+  let calmReached = false;
   const anchor = (t: number, now: number) => {
     offset = now + lead - t;
     calmSince = now;
     slack = Infinity;
     lateSince = null;
+    calmReached = false;
   };
   return {
     // When to play an item with this timestamp (microseconds) on the clock
@@ -40,8 +42,12 @@ export const createPlayout = (minLead = MIN_LEAD) => {
     at: (timestamp: number, now: number): number | null => {
       const t = timestamp / 1e6;
       if (offset === null || t + offset > now + lead + FAR_AHEAD) anchor(t, now);
+      if (now - calmSince >= CALM && !calmReached) {
+        calmReached = true;
+        slack = Infinity;
+      }
       // Without an item since the late one nothing is known: no lowering.
-      lowering = now - calmSince >= CALM && slack > minLead && slack < Infinity;
+      lowering = calmReached && slack > minLead && slack < Infinity;
       if (lowering) {
         const d = Math.min(DRIFT * Math.min(IDLE, Math.max(0, now - last)), slack - minLead);
         offset! -= d;
@@ -60,6 +66,7 @@ export const createPlayout = (minLead = MIN_LEAD) => {
       offset! += raise;
       calmSince = now;
       slack = Infinity;
+      calmReached = false;
       if (when + raise >= now) {
         lateSince = null;
         return when + raise;
@@ -76,6 +83,7 @@ export const createPlayout = (minLead = MIN_LEAD) => {
     reset: () => {
       offset = null;
       lead = minLead;
+      calmReached = false;
     },
   };
 };
