@@ -2732,3 +2732,11 @@ Bergamot was close to useless for Chinese. Tests of small models on the hard cha
 Detection: Latin-script lines are told by eld (n-grams, extra-small database, about 300 kB, loaded when idle; only languages with models; only a reliable answer, at least two words); before, common words missed most short French lines. eld 2.1.0, as 2.1.1 was younger than the lockfile's minimum release age.
 
 The hover bar showed every action as a word. As Discord now: icons for React, Reply, Edit, Translate (messages in another language) and More; More and a right-click (not on links, media, inputs or selected text) open a menu with the phone sheet's list; delete asks there. Not checked in a browser with WebGPU f16 here (headless Chromium has none): the user tests on test.kallisti.chat.
+
+## Stream playback and server performance improvements
+
+- **Audio buffer pooling**: during stream sound playback, 50 `AudioBuffer` objects per second were allocated and discarded. `client.svelte.ts` now reuses finished buffers from a small pool (via `onended`), eliminating 3,000 allocations per minute per stream with zero GC pauses.
+- **Background power saving**: when a tab is hidden without an active Picture-in-Picture window, `client.svelte.ts` avoids drawing to 2D canvases at 60 fps and slows the background worker ticker to 100 ms, keeping audio and queues in sync while drastically cutting background CPU/GPU usage.
+- **Queue pump allocations and hidden strip canvases**: `lastDue` in `playout.ts` now inspects queue entries directly, avoiding array mapping allocations on every animation frame. `StreamStage.svelte` detaches hidden thumbnail strip canvases when `stripHidden` is active so non-focused streams skip canvas drawing.
+- **Responsive jitter recovery**: `playout.ts` lowers its lead after 15 s of calm (was 60 s) at 20 ms/s (`DRIFT = 0.02`, audio 2 % faster, was 0.5 %), recovering a 250 ms jitter step in ~27 s instead of ~110 s.
+- **Server frame allocation elision**: `server/internal/stream/hub.go` skips allocating the 4-byte prefixed frame buffer when a streamer has no active viewers or when viewers wait for a keyframe, cutting unnecessary memory allocations on the server.
