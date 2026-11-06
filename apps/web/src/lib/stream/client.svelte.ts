@@ -473,7 +473,9 @@ export const createStreamClient = (url: string, token: () => Promise<string>, au
         if (at === null || !v.gain || !plane) return;
         const buffer = getBuffer(plane.length);
         buffer.copyToChannel(plane, 0);
-        const src = new AudioBufferSourceNode(ctx, { buffer, playbackRate: v.playout.rate() });
+        // Play at native rate (1.0) without chunk-boundary resampling to eliminate robot-voicing.
+        // Catch-up during lowering is achieved cleanly by advancing packet start times ('at').
+        const src = new AudioBufferSourceNode(ctx, { buffer });
         src.onended = () => putBuffer(buffer);
         src.connect(v.gain);
         src.start(at);
@@ -494,24 +496,30 @@ export const createStreamClient = (url: string, token: () => Promise<string>, au
   };
 
   // Watched pictures are drawn on animation frames; in a hidden tab (none
-  // there) on a worker's timer, so picture-in-picture goes on, in sync.
+  // there) or when animation frames are throttled (unfocused window) on a
+  // worker's timer, so playback never stalls at 1fps.
   let raf = 0;
   let ticker: Worker | null = null;
+  let lastRaf = 0;
   const pumpAll = () => watched.forEach((v, session) => pump(session, v));
   const hasPip = () => typeof document !== "undefined" && !!document.pictureInPictureElement;
-  const tickRate = () => ticker?.postMessage(document.hidden ? (hasPip() ? 1000 / 60 : 100) : 1000);
+  const tickRate = () => ticker?.postMessage(document.hidden && !hasPip() ? 100 : 1000 / 60);
   const startLoop = () => {
     if (ticker) return;
     ticker = new Ticker();
-    ticker.onmessage = () => document.hidden && pumpAll();
+    ticker.onmessage = () => {
+      if (document.hidden || performance.now() - lastRaf > 40) pumpAll();
+    };
     tickRate();
     document.addEventListener("visibilitychange", tickRate);
     document.addEventListener("enterpictureinpicture", tickRate);
     document.addEventListener("leavepictureinpicture", tickRate);
     const frame = () => {
       raf = requestAnimationFrame(frame);
+      lastRaf = performance.now();
       pumpAll();
     };
+    lastRaf = performance.now();
     raf = requestAnimationFrame(frame);
   };
   const stopLoop = () => {
