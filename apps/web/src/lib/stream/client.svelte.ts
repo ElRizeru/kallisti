@@ -470,7 +470,9 @@ export const createStreamClient = (url: string, token: () => Promise<string>, au
         if (at === null || !v.gain || !plane) return;
         const buffer = getBuffer(plane.length);
         buffer.copyToChannel(plane, 0);
-        const src = new AudioBufferSourceNode(ctx, { buffer, playbackRate: v.playout.rate() });
+        // Play at native rate (1.0) without chunk-boundary resampling to eliminate robot-voicing.
+        // Catch-up during lowering is achieved cleanly by advancing packet start times ('at').
+        const src = new AudioBufferSourceNode(ctx, { buffer });
         src.onended = () => putBuffer(buffer);
         src.connect(v.gain);
         src.start(at);
