@@ -451,6 +451,15 @@ export const createStreamClient = (url: string, token: () => Promise<string>, au
     if (!ctx) return;
     v.gain = new GainNode(ctx, { gain: deaf ? 0 : (sounds[session] ?? 1) });
     v.gain.connect(ctx.destination);
+    const pool: AudioBuffer[] = [];
+    const getBuffer = (length: number) => {
+      const b = pool.pop();
+      if (b && b.length === length) return b;
+      return ctx.createBuffer(1, length, SOUND.sampleRate);
+    };
+    const putBuffer = (b: AudioBuffer) => {
+      if (pool.length < 32) pool.push(b);
+    };
     // WebCodecs where it has Opus, else libopus (the iOS app has no
     // AudioDecoder; the Linux app's leaks). Mono: one channel of two.
     v.sound = voiceDecoder({
@@ -459,9 +468,10 @@ export const createStreamClient = (url: string, token: () => Promise<string>, au
         const at = runs ? v.playout.at(timestamp, ctx.currentTime) : null;
         if (runs && at === null) v.stats.late("sound");
         if (at === null || !v.gain || !plane) return;
-        const buffer = ctx.createBuffer(1, plane.length, SOUND.sampleRate);
+        const buffer = getBuffer(plane.length);
         buffer.copyToChannel(plane, 0);
         const src = new AudioBufferSourceNode(ctx, { buffer, playbackRate: v.playout.rate() });
+        src.onended = () => putBuffer(buffer);
         src.connect(v.gain);
         src.start(at);
       },
